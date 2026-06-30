@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "demo-ci"
-        CONTAINER_NAME = "demo-ci-container"
+        IMAGE_NAME = "demo-nginx"
+        CONTAINER_NAME = "demo-nginx"
         PORT = "8081"
     }
 
@@ -11,35 +11,27 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'git@github.com:Lilace121/demo-ci.git',
-                    credentialsId: 'github-ssh'
+                git url: 'https://github.com/Lilace121/demo-ci.git',
+                    branch: 'main'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Image') {
             steps {
-                sh '''
-                echo "开始构建 Docker 镜像..."
-                docker build -t $IMAGE_NAME .
-                '''
+                sh 'docker build -t $IMAGE_NAME .'
             }
         }
 
-        stage('Stop Old Container') {
+        stage('Stop Old') {
             steps {
-                sh '''
-                echo "停止旧容器（如果存在）..."
-                docker stop $CONTAINER_NAME || true
-                docker rm $CONTAINER_NAME || true
-                '''
+                sh 'docker stop $CONTAINER_NAME || true'
+                sh 'docker rm $CONTAINER_NAME || true'
             }
         }
 
-        stage('Run Container') {
+        stage('Run') {
             steps {
                 sh '''
-                echo "启动新容器..."
                 docker run -d \
                     --name $CONTAINER_NAME \
                     -p $PORT:80 \
@@ -48,22 +40,14 @@ pipeline {
             }
         }
 
-        stage('Verify') {
-            steps {
-                sh '''
-                echo "检查容器状态..."
-                docker ps | grep $CONTAINER_NAME || true
-                '''
-            }
-        }
     }
 
     post {
         success {
-            echo "✅ 部署成功"
+            echo "SUCCESS"
         }
         failure {
-            echo "❌ 部署失败"
+            echo "FAILED"
         }
     }
 }
