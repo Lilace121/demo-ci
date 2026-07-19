@@ -1,53 +1,148 @@
 pipeline {
+
     agent any
 
+
     environment {
-        IMAGE_NAME = "demo-nginx"
-        CONTAINER_NAME = "demo-nginx"
-        PORT = "8081"
+
+        IMAGE_NAME = "cloudops-demo"
+
+        IMAGE_TAG = "v1"
+
+        ACR_REGISTRY = "crpi-38urml8fe00gm6pl.cn-shenzhen.personal.cr.aliyuncs.com"
+
+        ACR_IMAGE = "crpi-38urml8fe00gm6pl.cn-shenzhen.personal.cr.aliyuncs.com/cloudopsczq/cloudops-demo:v1"
+
     }
+
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/Lilace121/demo-ci.git',
-                    branch: 'main'
-            }
-        }
 
-        stage('Build Image') {
-            steps {
-                sh 'docker build -t $IMAGE_NAME .'
-            }
-        }
+        stage('Build') {
 
-        stage('Stop Old') {
             steps {
-                sh 'docker stop $CONTAINER_NAME || true'
-                sh 'docker rm $CONTAINER_NAME || true'
-            }
-        }
 
-        stage('Run') {
-            steps {
                 sh '''
-                docker run -d \
-                    --name $CONTAINER_NAME \
-                    -p $PORT:80 \
-                    $IMAGE_NAME
+                cd app/cloudops-demo
+
+                mvn clean package -DskipTests
                 '''
+
             }
+
         }
+
+
+
+        stage('Docker Build') {
+
+            steps {
+
+                sh '''
+
+                docker build \
+                -f docker/Dockerfile \
+                -t ${IMAGE_NAME}:${IMAGE_TAG} .
+
+                '''
+
+            }
+
+        }
+
+
+
+        stage('Docker Push') {
+
+            steps {
+
+
+                withCredentials([
+
+                    usernamePassword(
+
+                        credentialsId: 'aliyun-acr',
+
+                        usernameVariable: 'ACR_USER',
+
+                        passwordVariable: 'ACR_PASS'
+
+                    )
+
+                ]) {
+
+
+                    sh '''
+
+                    echo $ACR_PASS | docker login \
+                    --username $ACR_USER \
+                    --password-stdin \
+                    ${ACR_REGISTRY}
+
+
+
+                    docker tag \
+                    ${IMAGE_NAME}:${IMAGE_TAG} \
+                    ${ACR_IMAGE}
+
+
+
+                    docker push ${ACR_IMAGE}
+
+                    '''
+
+                }
+
+            }
+
+        }
+
+
+
+        stage('Deploy') {
+
+            steps {
+
+
+                sh '''
+
+                docker stop cloudops-demo || true
+
+                docker rm cloudops-demo || true
+
+
+                docker run -d \
+                -p 8081:8081 \
+                --name cloudops-demo \
+                ${IMAGE_NAME}:${IMAGE_TAG}
+
+
+                '''
+
+            }
+
+        }
+
 
     }
+
 
     post {
+
         success {
-            echo "SUCCESS"
+
+            echo 'SUCCESS'
+
         }
+
+
         failure {
-            echo "FAILED"
+
+            echo 'FAILED'
+
         }
+
     }
+
 }
